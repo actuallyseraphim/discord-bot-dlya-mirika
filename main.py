@@ -7,10 +7,10 @@ from PIL import Image
 from io import BytesIO
 import numpy as np
 
-import pyopencl as cl
-from futhark import tiles 
+from futhark import _tiles
+from futhark_ffi import Futhark
 
-fut = tiles.tiles()
+fut = Futhark(_tiles)
 
 bot = commands.Bot()
 
@@ -52,13 +52,12 @@ CREATE TABLE IF NOT EXISTS cooldowns (
     user_id INTEGER PRIMARY KEY,
     expires_at INTEGER
 )
-""") 
-
+""")
 
 def choose_random_role_joke(guild: discord.Guild):
     available_roles = []
     for role_id, chance in ROLE_CHANCES.items():
-        if chance > 1: continue
+        if chance > 2: continue
         role = guild.get_role(role_id)
         if role: available_roles.append((role, chance))
 
@@ -102,6 +101,7 @@ async def on_ready():
 Roll your role
 """, guild_ids=[1552386476686446622])
 async def roll(ctx: discord.Interaction):
+    await ctx.defer()
     if ctx.author.id != 1058359473904812083 and maintenance:
         await ctx.respond("sorry, bot is under maintenance rn")
         return
@@ -146,6 +146,7 @@ async def roll(ctx: discord.Interaction):
 If you are @Crown Prince/Crown Princess you have a 1% chance to get @King but you @Serf otherwise.
 """, guild_ids=[1552386476686446622])
 async def coronation(ctx: discord.Interaction):
+    await ctx.defer()
     if ctx.author.id != 1058359473904812083 and maintenance:
         await ctx.respond("sorry, bot is under maintenance rn")
         return
@@ -166,30 +167,15 @@ async def coronation(ctx: discord.Interaction):
         await ctx.respond(f"get nerfed...")
 
 
-TILE_SIZE = 32
-
-ground_tiles = {
-    0: Image.open("assets/grass.png").convert("RGBA"),
-}
-
-building_tiles = {
-    0: Image.new("RGBA", (32,32), (0,0,0,0)),
-    1: Image.open("assets/home.png").convert("RGBA"),
-}
-
-tilemap = np.zeros((24,24,2), np.int8)
-
-tilemap[:,:,1][np.random.rand(*tilemap.shape[:2]) < 0.05] = 1
-
 @bot.slash_command(name="map", description="""
 Shows world map
 """, guild_ids=[1552386476686446622])
 async def show_map(ctx: discord.Interaction):
+    await ctx.defer()
     if ctx.author.id != 1058359473904812083:
         await ctx.respond("not implemented yet")
         return
-    await ctx.defer()
-    image = Image.fromarray(fut.main(320, 320).get(), mode="RGB")
+    image = Image.fromarray(fut.from_futhark(fut.main(320, 320)), mode="RGB")
     buffer = BytesIO()
     image.save(buffer, format="PNG")
     buffer.seek(0)
